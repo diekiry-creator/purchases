@@ -12,6 +12,7 @@ import com.davydov.purchases.model.Purchase;
 import com.davydov.purchases.model.PurchaseUI;
 import com.davydov.purchases.repository.PurchasesRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,11 @@ import org.springframework.web.client.RestTemplate;
 
 @RestController
 public class PurchaseController {
+
+    @Value("${USERS_SERVICE_URL}")
+    public String usersServiceUrl;
+    @Value("${BOOKS_SERVICE_URL}")
+    public String booksServiceUrl;
 
     @Autowired
     PurchasesRepository repository;
@@ -96,7 +102,7 @@ public class PurchaseController {
         Double purchasePrice = Objects.requireNonNull(bookResponse.getBody()).getPurchasePrice();
         HttpEntity<UserOperation> userRequest = new HttpEntity<>(new UserOperation(requisites, purchasePrice));
         ResponseEntity<UserInfo> userResponse = restTemplate
-                .exchange("http://graph.facebook.com/pivotalsoftware", HttpMethod.PUT, userRequest, UserInfo.class);
+                .exchange(usersServiceUrl + "", HttpMethod.PUT, userRequest, UserInfo.class);
 
         if (userResponse.getStatusCode() != HttpStatus.OK)
         {

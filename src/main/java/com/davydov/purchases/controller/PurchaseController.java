@@ -1,0 +1,113 @@
+package com.davydov.purchases.controller;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import com.davydov.purchases.dto.*;
+import com.davydov.purchases.model.Purchase;
+import com.davydov.purchases.model.PurchaseUI;
+import com.davydov.purchases.repository.PurchasesRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+
+@RestController
+public class PurchaseController {
+
+    @Autowired
+    PurchasesRepository repository;
+
+    @GetMapping("/bulkcreate")
+    public String bulkcreate(){
+        // save a single
+        repository.save(new Purchase(1, 1, 1));
+        // save a list
+        repository.saveAll(Arrays.asList(new Purchase(2, 2,2)
+                , new Purchase(3, 3,3)
+                , new Purchase(4, 4,4)
+                , new Purchase(5, 5,5)));
+
+        return "Purchases are created";
+    }
+    @PostMapping("/create")
+    public String create(@RequestBody PurchaseUI purchase){
+        // save a single
+        repository.save(new Purchase(purchase.getUserId(), purchase.getBookId(), purchase.getPrice()));
+
+        return "Customer is created";
+    }
+    @GetMapping("/findall")
+    public List<PurchaseUI> findAll(){
+
+        List<Purchase> purchases = repository.findAll();
+        List<PurchaseUI> purchaseUI = new ArrayList<>();
+
+        for (Purchase purchase : purchases) {
+            purchaseUI.add(new PurchaseUI(purchase.getUserId(), purchase.getBookId(), purchase.getPrice()));
+        }
+
+        return purchaseUI;
+    }
+
+    @RequestMapping("/search/{id}")
+    public String search(@PathVariable long id){
+        String purchase = "";
+        purchase = repository.findById(id).toString();
+        return purchase;
+    }
+
+    @RequestMapping("/searchbyuserid/{id}")
+    public List<PurchaseUI> fetchDataByUserId(@PathVariable long id){
+
+        List<Purchase> purchases = repository.findByUserId(id);
+        List<PurchaseUI> purchaseUI = new ArrayList<>();
+
+        for (Purchase purchase : purchases) {
+            purchaseUI.add(new PurchaseUI(purchase.getUserId(), purchase.getBookId(), purchase.getPrice()));
+        }
+
+        return purchaseUI;
+    }
+
+
+    @PostMapping("/create-purchase")
+    public String createPurchase(@RequestBody CreatePurchase data){
+        UserRequisites requisites = data.getRequisites();
+        Long bookTypeId = data.getBookTypeId();
+
+        RestTemplate restTemplate = new RestTemplate();
+        HttpEntity<BuyingBooks> bookRequest = new HttpEntity<>(new BuyingBooks(bookTypeId, 1L));
+        ResponseEntity<BookInfo> bookResponse = restTemplate
+                .exchange("http://graph.facebook.com/pivotalsoftware", HttpMethod.PUT, bookRequest, BookInfo.class);
+        if (bookResponse.getStatusCode() != HttpStatus.OK)
+        {
+
+        }
+
+        HttpEntity<UserOperation> userRequest = new HttpEntity<UserOperation>(new UserOperation(requisites, bookResponse.getBody().getPurchasePrice()));
+        ResponseEntity<UserInfo> userResponse = restTemplate
+                .exchange("http://graph.facebook.com/pivotalsoftware", HttpMethod.PUT, userRequest, UserInfo.class);
+
+
+
+
+
+        PurchaseUI purchase = null;
+        repository.save(new Purchase(purchase.getUserId(), purchase.getBookId(), purchase.getPrice()));
+
+        return "Customer is created";
+    }
+
+}

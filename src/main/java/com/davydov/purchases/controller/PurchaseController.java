@@ -1,5 +1,7 @@
 package com.davydov.purchases.controller;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -14,12 +16,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
 
@@ -113,5 +110,26 @@ public class PurchaseController {
         repository.save(new Purchase(userId, bookTypeId, purchasePrice));
 
         return UserResponse.success();
+    }
+
+    @GetMapping("list-of-orders")
+    public List<PurchaseUI> getListOfOrders(@RequestParam String username) throws URISyntaxException {
+        List<PurchaseUI> purchaseUI = new ArrayList<>();
+
+        RestTemplate restTemplate = new RestTemplate();
+        HttpEntity<UserOperation> userRequest = new HttpEntity<>(new UserOperation(new UserRequisites(username, null), null));
+        ResponseEntity<UserInfo> userResponse = restTemplate
+                .exchange("http://graph.facebook.com/pivotalsoftware", HttpMethod.GET, userRequest, UserInfo.class);
+
+        if (userResponse.getStatusCode() != HttpStatus.OK) {
+            return purchaseUI;
+        }
+
+        List<Purchase> purchases = repository.findByUserId(Objects.requireNonNull(userResponse.getBody()).getUserId());
+        for (Purchase purchase : purchases) {
+            purchaseUI.add(new PurchaseUI(purchase.getUserId(), purchase.getBookId(), purchase.getPrice()));
+        }
+
+        return purchaseUI;
     }
 }

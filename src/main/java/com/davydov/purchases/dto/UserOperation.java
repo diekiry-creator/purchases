@@ -5,7 +5,7 @@ import javax.validation.constraints.NotNull;
 public class UserOperation {
     @NotNull
     UserRequisites requisites;
-    @NotNull
+
     Double price;
 
     public UserOperation(@NotNull UserRequisites requisites, @NotNull Double price) {

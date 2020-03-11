@@ -5,8 +5,13 @@ import javax.validation.constraints.NotNull;
 public class UserRequisites {
     @NotNull
     private String username;
-    @NotNull
+
     private String password;
+
+    public UserRequisites(@NotNull String username, String password) {
+        this.username = username;
+        this.password = password;
+    }
 
     public String getUsername() {
         return username;

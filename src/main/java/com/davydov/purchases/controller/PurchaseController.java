@@ -3,6 +3,7 @@ package com.davydov.purchases.controller;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 import com.davydov.purchases.dto.*;
 import com.davydov.purchases.model.Purchase;
@@ -82,34 +83,35 @@ public class PurchaseController {
 
 
     @PostMapping("/create-purchase")
-    public String createPurchase(@RequestBody CreatePurchase data){
+    public UserResponse createPurchase(@RequestBody CreatePurchase data){
         UserRequisites requisites = data.getRequisites();
         Long bookTypeId = data.getBookTypeId();
+        Long amountBooks = data.getAmountBooks();
 
         RestTemplate restTemplate = new RestTemplate();
-        HttpEntity<bookOperation> bookRequest = new HttpEntity<>(new bookOperation(bookTypeId, -1L));
+        HttpEntity<bookOperation> bookRequest = new HttpEntity<>(new bookOperation(bookTypeId, -amountBooks));
         ResponseEntity<BookInfo> bookResponse = restTemplate
                 .exchange("http://graph.facebook.com/pivotalsoftware", HttpMethod.PUT, bookRequest, BookInfo.class);
+
         if (bookResponse.getStatusCode() != HttpStatus.OK)
-        {
+            return UserResponse.error("Товар отсутствует на складе.");
 
-        }
-
-        HttpEntity<UserOperation> userRequest = new HttpEntity<>(new UserOperation(requisites, bookResponse.getBody().getPurchasePrice()));
+        Double purchasePrice = Objects.requireNonNull(bookResponse.getBody()).getPurchasePrice();
+        HttpEntity<UserOperation> userRequest = new HttpEntity<>(new UserOperation(requisites, purchasePrice));
         ResponseEntity<UserInfo> userResponse = restTemplate
                 .exchange("http://graph.facebook.com/pivotalsoftware", HttpMethod.PUT, userRequest, UserInfo.class);
+
         if (userResponse.getStatusCode() != HttpStatus.OK)
         {
-            bookRequest = new HttpEntity<>(new bookOperation(bookTypeId, -1L));
-            bookResponse = restTemplate
+            bookRequest = new HttpEntity<>(new bookOperation(bookTypeId, amountBooks));
+            restTemplate
                     .exchange("http://graph.facebook.com/pivotalsoftware", HttpMethod.PUT, bookRequest, BookInfo.class);
+            return UserResponse.error(Objects.requireNonNull(userResponse.getBody()).getExplanation());
         }
 
+        Long userId = Objects.requireNonNull(userResponse.getBody()).getUserId();
+        repository.save(new Purchase(userId, bookTypeId, purchasePrice));
 
-
-        repository.save(new Purchase(purchase.getUserId(), purchase.getBookId(), purchase.getPrice()));
-
-        return "Customer is created";
+        return UserResponse.success();
     }
-
 }

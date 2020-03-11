@@ -7,6 +7,8 @@ public class CreatePurchase {
     UserRequisites requisites;
     @NotNull
     Long bookTypeId;
+    @NotNull
+    Long amountBooks;
 
     public UserRequisites getRequisites() {
         return requisites;
@@ -22,5 +24,13 @@ public class CreatePurchase {
 
     public void setBookTypeId(Long bookTypeId) {
         this.bookTypeId = bookTypeId;
+    }
+
+    public Long getAmountBooks() {
+        return amountBooks;
+    }
+
+    public void setAmountBooks(Long amountBooks) {
+        this.amountBooks = amountBooks;
     }
 }

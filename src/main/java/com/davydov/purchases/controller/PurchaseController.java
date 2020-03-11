@@ -9,7 +9,6 @@ import com.davydov.purchases.model.Purchase;
 import com.davydov.purchases.model.PurchaseUI;
 import com.davydov.purchases.repository.PurchasesRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -88,7 +87,7 @@ public class PurchaseController {
         Long bookTypeId = data.getBookTypeId();
 
         RestTemplate restTemplate = new RestTemplate();
-        HttpEntity<BuyingBooks> bookRequest = new HttpEntity<>(new BuyingBooks(bookTypeId, 1L));
+        HttpEntity<bookOperation> bookRequest = new HttpEntity<>(new bookOperation(bookTypeId, -1L));
         ResponseEntity<BookInfo> bookResponse = restTemplate
                 .exchange("http://graph.facebook.com/pivotalsoftware", HttpMethod.PUT, bookRequest, BookInfo.class);
         if (bookResponse.getStatusCode() != HttpStatus.OK)
@@ -96,15 +95,18 @@ public class PurchaseController {
 
         }
 
-        HttpEntity<UserOperation> userRequest = new HttpEntity<UserOperation>(new UserOperation(requisites, bookResponse.getBody().getPurchasePrice()));
+        HttpEntity<UserOperation> userRequest = new HttpEntity<>(new UserOperation(requisites, bookResponse.getBody().getPurchasePrice()));
         ResponseEntity<UserInfo> userResponse = restTemplate
                 .exchange("http://graph.facebook.com/pivotalsoftware", HttpMethod.PUT, userRequest, UserInfo.class);
+        if (userResponse.getStatusCode() != HttpStatus.OK)
+        {
+            bookRequest = new HttpEntity<>(new bookOperation(bookTypeId, -1L));
+            bookResponse = restTemplate
+                    .exchange("http://graph.facebook.com/pivotalsoftware", HttpMethod.PUT, bookRequest, BookInfo.class);
+        }
 
 
 
-
-
-        PurchaseUI purchase = null;
         repository.save(new Purchase(purchase.getUserId(), purchase.getBookId(), purchase.getPrice()));
 
         return "Customer is created";

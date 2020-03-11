@@ -2,13 +2,13 @@ package com.davydov.purchases.dto;
 
 import javax.validation.constraints.NotNull;
 
-public class BuyingBooks {
+public class bookOperation {
     @NotNull
     Long bookTypeId;
     @NotNull
     Long amountBooks;
 
-    public BuyingBooks(@NotNull Long bookTypeId, @NotNull Long amountBooks) {
+    public bookOperation(@NotNull Long bookTypeId, @NotNull Long amountBooks) {
         this.bookTypeId = bookTypeId;
         this.amountBooks = amountBooks;
     }

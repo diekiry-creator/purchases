@@ -13,10 +13,7 @@ import com.davydov.purchases.model.PurchaseUI;
 import com.davydov.purchases.repository.PurchasesRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
@@ -49,10 +46,10 @@ public class PurchaseController {
         // save a single
         repository.save(new Purchase(purchase.getUserId(), purchase.getBookId(), purchase.getPrice()));
 
-        return "Customer is created";
+        return "Purchase is created";
     }
     @GetMapping("/findall")
-    public List<PurchaseUI> findAll(){
+    public ResponseEntity<List<Purchase>> findAll(){
 
         List<Purchase> purchases = repository.findAll();
         List<PurchaseUI> purchaseUI = new ArrayList<>();
@@ -61,7 +58,7 @@ public class PurchaseController {
             purchaseUI.add(new PurchaseUI(purchase.getUserId(), purchase.getBookId(), purchase.getPrice()));
         }
 
-        return purchaseUI;
+        return ResponseEntity.ok().body(purchases);
     }
 
     @RequestMapping("/search/{id}")
@@ -72,7 +69,7 @@ public class PurchaseController {
     }
 
     @RequestMapping("/searchbyuserid/{id}")
-    public List<PurchaseUI> fetchDataByUserId(@PathVariable long id){
+    public ResponseEntity<List<Purchase>> fetchDataByUserId(@PathVariable long id){
 
         List<Purchase> purchases = repository.findByUserId(id);
         List<PurchaseUI> purchaseUI = new ArrayList<>();
@@ -81,7 +78,7 @@ public class PurchaseController {
             purchaseUI.add(new PurchaseUI(purchase.getUserId(), purchase.getBookId(), purchase.getPrice()));
         }
 
-        return purchaseUI;
+        return ResponseEntity.ok().body(purchases);
     }
 
 
@@ -119,7 +116,7 @@ public class PurchaseController {
     }
 
     @GetMapping("list-of-orders")
-    public List<PurchaseUI> getListOfOrders(@RequestParam String username) throws URISyntaxException {
+    public List<PurchaseUI> getListOfOrders(@RequestParam String username) {
         List<PurchaseUI> purchaseUI = new ArrayList<>();
 
         RestTemplate restTemplate = new RestTemplate();
@@ -127,6 +124,7 @@ public class PurchaseController {
         ResponseEntity<UserInfo> userResponse = restTemplate
                 .exchange("http://graph.facebook.com/pivotalsoftware", HttpMethod.GET, userRequest, UserInfo.class);
 
+        
         if (userResponse.getStatusCode() != HttpStatus.OK) {
             return purchaseUI;
         }

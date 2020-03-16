@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 
@@ -89,29 +90,46 @@ public class PurchaseController {
         Long amountBooks = data.getAmountBooks();
 
         RestTemplate restTemplate = new RestTemplate();
-        HttpEntity<bookOperation> bookRequest = new HttpEntity<>(new bookOperation(bookTypeId, -amountBooks));
-        ResponseEntity<BookInfo> bookResponse = restTemplate
-                .exchange("http://graph.facebook.com/pivotalsoftware", HttpMethod.PUT, bookRequest, BookInfo.class);
+        HttpEntity<bookOperation> bookRequest = new HttpEntity<>(new bookOperation(bookTypeId, amountBooks));
+        ResponseEntity<BookInfo> bookResponse;
+        try {
+            bookResponse = restTemplate
+                    .exchange("http://192.168.1.159:9090/books/sub", HttpMethod.PUT, bookRequest, BookInfo.class);
 
-        if (bookResponse.getStatusCode() != HttpStatus.OK)
-            return UserResponse.error("Товар отсутствует на складе.");
+            if (bookResponse.getStatusCode() != HttpStatus.OK)
+                return UserResponse.error("Недостаточно товара на складе.");
+
+        } catch (HttpStatusCodeException exception) {
+            return UserResponse.error("Сервер книг недоступен.");
+        }
 
         Double purchasePrice = Objects.requireNonNull(bookResponse.getBody()).getPurchasePrice();
         HttpEntity<UserOperation> userRequest = new HttpEntity<>(new UserOperation(requisites, purchasePrice));
-        ResponseEntity<UserInfo> userResponse = restTemplate
-                .exchange(usersServiceUrl + "", HttpMethod.PUT, userRequest, UserInfo.class);
+        ResponseEntity<UserInfo> userResponse;
+        try {
+            userResponse = restTemplate
+                    .exchange(usersServiceUrl + "", HttpMethod.PUT, userRequest, UserInfo.class);
 
-        if (userResponse.getStatusCode() != HttpStatus.OK)
-        {
+            if (userResponse.getStatusCode() != HttpStatus.OK)
+            {
+                bookRequest = new HttpEntity<>(new bookOperation(bookTypeId, amountBooks));
+                restTemplate
+                        .exchange("http://192.168.1.159:9090/books/ref", HttpMethod.PUT, bookRequest, BookInfo.class);
+                return UserResponse.error(Objects.requireNonNull(userResponse.getBody()).getExplanation());
+            }
+        } catch (HttpStatusCodeException exception) {
+
             bookRequest = new HttpEntity<>(new bookOperation(bookTypeId, amountBooks));
-            restTemplate
-                    .exchange("http://graph.facebook.com/pivotalsoftware", HttpMethod.PUT, bookRequest, BookInfo.class);
-            return UserResponse.error(Objects.requireNonNull(userResponse.getBody()).getExplanation());
+            bookResponse = restTemplate
+                    .exchange("http://192.168.1.159:9090/books/ref", HttpMethod.PUT, bookRequest, BookInfo.class);
+            if (bookResponse.getStatusCode() != HttpStatus.OK)
+                return UserResponse.error("Сервер пользователей недоступен. Возврат товара не выполнен.");
+
+            return UserResponse.error("Сервер пользователей недоступен.  Возврат товара выполнен.");
         }
 
         Long userId = Objects.requireNonNull(userResponse.getBody()).getUserId();
         repository.save(new Purchase(userId, bookTypeId, purchasePrice));
-
         return UserResponse.success();
     }
 

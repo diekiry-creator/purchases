@@ -84,12 +84,14 @@ public class PurchaseController {
 
 
     @PostMapping("/create-purchase")
-    public UserResponse createPurchase(@RequestBody CreatePurchase data){
+    public ResponseEntity<String> createPurchase(@RequestBody CreatePurchase data){
         UserRequisites requisites = data.getRequisites();
         Long bookTypeId = data.getBookTypeId();
         Long amountBooks = data.getAmountBooks();
 
         RestTemplate restTemplate = new RestTemplate();
+
+        // Запрос к сервису книг (получение стоимости книги)
         HttpEntity<bookOperation> bookRequest = new HttpEntity<>(new bookOperation(bookTypeId, amountBooks));
         ResponseEntity<BookInfo> bookResponse;
         try {
@@ -97,61 +99,66 @@ public class PurchaseController {
                     .exchange("http://192.168.1.159:9090/books/sub", HttpMethod.PUT, bookRequest, BookInfo.class);
 
             if (bookResponse.getStatusCode() != HttpStatus.OK)
-                return UserResponse.error("Недостаточно товара на складе.");
+                return ResponseEntity.badRequest().body("Недостаточно товара на складе.");
 
         } catch (HttpStatusCodeException exception) {
-            return UserResponse.error("Сервер книг недоступен.");
+            return ResponseEntity.badRequest().body("Сервер книг недоступен.");
         }
 
         Double purchasePrice = Objects.requireNonNull(bookResponse.getBody()).getPurchasePrice();
+
+        // Запрос к сервису пользователей (списание стоимости книги со счета, получение id пользователя)
         HttpEntity<UserOperation> userRequest = new HttpEntity<>(new UserOperation(requisites, purchasePrice));
         ResponseEntity<UserInfo> userResponse;
         try {
             userResponse = restTemplate
-                    .exchange(usersServiceUrl + "", HttpMethod.PUT, userRequest, UserInfo.class);
+                    .exchange(usersServiceUrl, HttpMethod.PUT, userRequest, UserInfo.class);
 
+            // Возврат книги, если у пользователя недостаточно средств
             if (userResponse.getStatusCode() != HttpStatus.OK)
             {
                 bookRequest = new HttpEntity<>(new bookOperation(bookTypeId, amountBooks));
                 restTemplate
                         .exchange("http://192.168.1.159:9090/books/ref", HttpMethod.PUT, bookRequest, BookInfo.class);
-                return UserResponse.error(Objects.requireNonNull(userResponse.getBody()).getExplanation());
+                return ResponseEntity.badRequest().body(Objects.requireNonNull(userResponse.getBody()).getExplanation());
             }
         } catch (HttpStatusCodeException exception) {
 
+            // Возврат книги, если в текущий момент сервис пользователей недоступен
             bookRequest = new HttpEntity<>(new bookOperation(bookTypeId, amountBooks));
             bookResponse = restTemplate
                     .exchange("http://192.168.1.159:9090/books/ref", HttpMethod.PUT, bookRequest, BookInfo.class);
             if (bookResponse.getStatusCode() != HttpStatus.OK)
-                return UserResponse.error("Сервер пользователей недоступен. Возврат товара не выполнен.");
+                return ResponseEntity.badRequest().body("Сервер пользователей недоступен. Возврат товара не выполнен.");
 
-            return UserResponse.error("Сервер пользователей недоступен.  Возврат товара выполнен.");
+            return ResponseEntity.badRequest().body("Сервер пользователей недоступен.  Возврат товара выполнен.");
         }
 
-        Long userId = Objects.requireNonNull(userResponse.getBody()).getUserId();
-        repository.save(new Purchase(userId, bookTypeId, purchasePrice));
-        return UserResponse.success();
+        // Добавление записи о заказе в таблицу БД
+        repository.save(new Purchase(Objects.requireNonNull(userResponse.getBody()).getUserId(), bookTypeId, purchasePrice));
+
+        return ResponseEntity.ok().body(null);
     }
 
     @GetMapping("list-of-orders")
-    public List<PurchaseUI> getListOfOrders(@RequestParam String username) {
-        List<PurchaseUI> purchaseUI = new ArrayList<>();
-
+    public ResponseEntity<?> getListOfOrders(@RequestParam String username) {
         RestTemplate restTemplate = new RestTemplate();
-        HttpEntity<UserOperation> userRequest = new HttpEntity<>(new UserOperation(new UserRequisites(username, null), null));
-        ResponseEntity<UserInfo> userResponse = restTemplate
-                .exchange("http://graph.facebook.com/pivotalsoftware", HttpMethod.GET, userRequest, UserInfo.class);
 
-        
+        // Запрос к сервису пользователей (получение id пользователя)
+        HttpEntity<UserOperation> userRequest = new HttpEntity<>(new UserOperation(new UserRequisites(username, null), null));
+        ResponseEntity<UserInfo> userResponse;
+        try {
+            userResponse = restTemplate
+                    .exchange(usersServiceUrl, HttpMethod.GET, userRequest, UserInfo.class);
+        } catch (HttpStatusCodeException exception) {
+            return ResponseEntity.badRequest().body("Сервис пользователей недоступен.");
+        }
         if (userResponse.getStatusCode() != HttpStatus.OK) {
-            return purchaseUI;
+            return ResponseEntity.badRequest().body("Пользователь не найден.");
         }
 
         List<Purchase> purchases = repository.findByUserId(Objects.requireNonNull(userResponse.getBody()).getUserId());
-        for (Purchase purchase : purchases) {
-            purchaseUI.add(new PurchaseUI(purchase.getUserId(), purchase.getBookId(), purchase.getPrice()));
-        }
 
-        return purchaseUI;
+        return ResponseEntity.ok().body(purchases);
     }
 }
